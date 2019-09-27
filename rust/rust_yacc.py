@@ -11,7 +11,11 @@ import rust_lex
 
 tokens = rust_lex.tokens
 
-inFile = sys.argv[1] # archivo de entrada
+if len(sys.argv) != 2:
+    print("Uso: python rust_yacc.py [archivo de entrada]")
+    exit()
+else:
+    inFile = sys.argv[1] # archivo de entrada
 
 # -- Sintaxis en BNF -- #
 
@@ -112,13 +116,35 @@ def p_expr(p):
 
 # Expresiones de bloque
 def p_block_expr(p):
-    '''block_expr : LBRACKET stmt expr RBRACKET
-                  | LBRACKET item expr RBRACKET
-                  | LBRACKET expr RBRACKET '''
-    if len(p) == 5:
-        p[0] = ('BLOCK_EXPR', 'LBRACKET', p[2], p[3], 'RBRACKET')
-    else:
-        p[0] = ('BLOCK_EXPR', 'LBRACKET', p[2], 'RBRACKET')
+    '''block_expr : LBRACKET block_expr_a RBRACKET
+                  | LBRACKET block_expr_b RBRACKET
+                  | LBRACKET block_expr_c RBRACKET
+                  | LBRACKET block_expr_d RBRACKET
+                  | LBRACKET block_expr_e RBRACKET '''
+    p[0] = ('BLOCK_EXPR', 'LBRACKET', p[2], 'RBRACKET')
+
+# Expresiones de apoyo para block_expr
+def p_block_expr_a(p):
+    '''block_expr_a : stmt block_expr_a
+                    | empty '''
+    p[0] = ('BLOCK_EXPR_A', p[1])
+
+def p_block_expr_b(p):
+    '''block_expr_b : stmt block_expr_e
+                    | item block_expr_e '''
+    p[0] = ('BLOCK_EXPR_B', p[1], p[2])
+
+def p_block_expr_c(p):
+    '''block_expr_c : stmt block_expr_b '''
+    p[0] = ('BLOCK_EXPR_C', p[1], p[2])
+
+def p_block_expr_d(p):
+    '''block_expr_d : item block_expr_b '''
+    p[0] = ('BLOCK_EXPR_D', p[1], p[2])
+
+def p_block_expr_e(p):
+    '''block_expr_e : expr '''
+    p[0] = ('BLOCK_EXPR_E', p[1])
 
 # Operadores binarios
 def p_binop_expr(p):
@@ -180,6 +206,7 @@ def p_return_expr(p):
     else:
         p[0] = ('RETURN', p[2])
 
+# Expresiones para Condicionales y Ciclos
 def p_no_struct_literal_expr(p):
     '''no_struct_literal_expr : literal
                               | literal binop literal 
@@ -197,10 +224,22 @@ def p_lit_suffix(p):
     p[0] = ('LIT_SUFFIX', 'ID')
 
 def p_literal(p):
-    '''literal : num_lit
+    '''literal : string_lit
+               | char_lit
+               | num_lit
                | bool_lit
                | lit_suffix '''
     p[0] = ('LITERAL', p[1])
+
+# String
+def p_string_lit(p):
+    'string_lit : STRING'
+    p[0] = ('STRING', p[1])
+
+# Caracteres (char)
+def p_char_lit(p):
+    'char_lit : CHAR'
+    p[0] = ('CHAR', p[1])
 
 # Números
 def p_num_lit(p):
@@ -260,7 +299,7 @@ def p_assignment_expr(p):
 # Asignación compuesta
 def p_compound_assignment_expr(p):
     '''compound_assignment_expr : expr arith_op ASSIGN expr
-                               | expr bitwise_op ASSIGN expr '''
+                                | expr bitwise_op ASSIGN expr '''
     p[0] = ('COMPOUND_ASSIGNMENT_EXPR', p[1], p[2], 'ASSIGN', p[4])
 
 # Tipos
@@ -272,6 +311,10 @@ def p_type(p):
             | CHARTYPE '''
     p[0] = ('TYPE', p[1])
 
+# Expresión vacía
+def p_empty(p):
+    'empty :'
+    pass
 
 
 # Manejar errores (modo pánico)
@@ -291,8 +334,15 @@ def p_error(p):
 parser = yacc.yacc()
 
 # Leer archivo de entrada
-with open(inFile,'r') as file:
-    data = file.read()
+try:
+    with open(inFile,'r') as file:
+        data = file.read()
 
-result = parser.parse(data)
-print(result) # Imprimir resultado en consola
+    result = parser.parse(data)
+    print(result) # Imprimir resultado en consola
+    
+    file.close()
+
+except FileNotFoundError:
+    print("El archivo de entrada no existe")
+    exit()
