@@ -5,9 +5,11 @@ fn main() {
     if x > y {
         return true;
     } else if x < y {
-        while x < y {
+        while true {
             y -= 1;
+            if y <= 0 {
+                break;
+            }
         }
-        return false;
     }
 }
