@@ -64,6 +64,7 @@ t_LPAREN        = r'\('
 t_RPAREN        = r'\)'
 t_LBRACKET      = r'\{'
 t_RBRACKET      = r'\}'
+t_DOT           = r'\.'
 t_COLON         = r':'
 t_SEMICOLON     = r';'
 t_QUOTE         = r'\''
@@ -144,6 +145,7 @@ tokens = [
             'RPAREN',
             'LBRACKET',
             'RBRACKET',
+            'DOT',
             'COLON',
             'SEMICOLON',
             'QUOTE',
