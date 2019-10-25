@@ -1,9 +1,3 @@
-# run -> python rust_yacc.py [archivo_entrada]
-#     -> python rust_yacc.py ../tests/data_types.rs
-#     -> python rust_yacc.py ../tests/errors/error_var.rs
-
-# Imprime en un archivo 'result.txt' un AST
-
 import sys
 if ".." not in sys.path: sys.path.insert(0,"..")
 
@@ -11,12 +5,6 @@ import ply.yacc as yacc
 import rust_lex
 
 tokens = rust_lex.tokens
-
-if len(sys.argv) != 2:
-    print("Uso: python rust_yacc.py [archivo de entrada]")
-    exit()
-else:
-    inFile = sys.argv[1] # archivo de entrada
 
 # Clase genérica para un nodo del AST
 class Node:
@@ -410,6 +398,7 @@ def p_empty(p):
     'empty :'
     p[0] = Node('empty', None, None)
 
+# -- Termina Sintaxis en BNF -- #
 
 # Manejar errores (modo pánico)
 def p_error(p):
@@ -427,23 +416,14 @@ def p_error(p):
 # Construir analizador
 parser = yacc.yacc()
 
-# Leer archivo de entrada
-try:
-    with open(inFile,'r') as file:
-        data = file.read()
+# Función para realizar análisis
+def parse(data, debug=0):
+    parser.error = 0
+    p = parser.parse(data, debug=debug)
+    if parser.error:
+        return None
+    return p
 
-    result = parser.parse(data) # generar resultado (AST)
-    print(scopes) # imprimir alcances en consola
-    
-    file.close()
-
-    # Escribir AST generado en archivo 'result.txt'
-    r = open("result.txt", 'w+')
-    r.write(str(result))
-    r.close()
-
-    print("AST generado en result.txt")
-
-except FileNotFoundError:
-    print("El archivo de entrada no existe")
-    exit()
+# Imprimir alcances en consola
+def print_scopes():
+    print(scopes)
