@@ -1,6 +1,6 @@
-# python rust_yacc.py [archivo_entrada]
-# -> python rust_yacc.py ../tests/data_types.rs
-# -> python rust_yacc.py ../tests/errors/error_var.rs
+# run -> python rust_yacc.py [archivo_entrada]
+#     -> python rust_yacc.py ../tests/data_types.rs
+#     -> python rust_yacc.py ../tests/errors/error_var.rs
 
 # Imprime en un archivo 'result.txt' un AST
 
@@ -39,9 +39,19 @@ class Node:
             ret += child.__str__(level+1)
         return ret
 
+class Table(dict):
+    def __init__(self):
+        self = dict()
+    
+    def add(self, key, value):
+        self[key] = value
 
 # Tabla de símbolos (hash)
-symbols_table = {}
+scopes = Table()
+scope_number = 0
+
+s = Table()
+scopes.add(scope_number, s)
 
 # -- Sintaxis en BNF -- #
 
@@ -75,18 +85,27 @@ def p_item(p):
 
 # Funciones
 def p_fn_item(p):
-    '''fn_item : FN ID LPAREN RPAREN block_expr '''
-    p[0] = Node('fn_item', [ p[5] ], p[2])
+    '''fn_item : FN ID add_to_scope LPAREN RPAREN block_expr '''
+    p[0] = Node('fn_item', [ p[6] ], p[2])
+
+def p_add_to_scope(p):
+    'add_to_scope :'
+    current_scope = scopes.get(scope_number)
+    current_scope.add(p[-1], 'fn')
 
 # Constantes
 def p_const_item(p):
     '''const_item : CONST ID COLON type ASSIGN expr SEMICOLON '''
     p[0] = Node('const_item', [ p[4], p[6] ], p[2])
+    current_scope = scopes.get(scope_number)
+    current_scope.add(p[2], p[4].leaf)
 
 # Estáticos
 def p_static_item(p):
     '''static_item : STATIC ID COLON type ASSIGN expr SEMICOLON '''
-    p[0] = Node('const_item', [ p[4], p[6] ], p[2])
+    p[0] = Node('static_item', [ p[4], p[6] ], p[2])
+    current_scope = scopes.get(scope_number)
+    current_scope.add(p[2], p[4].leaf)
 
 # Variables
 def p_let_decl(p):
@@ -98,24 +117,40 @@ def p_let_decl(p):
                 | LET ID COLON type SEMICOLON
                 | LET ID init SEMICOLON
                 | LET ID SEMICOLON '''
-    if p[2] == 'MUT':
+    if p[2] == 'mut':
         if len(p) == 8:
             p[0] = Node('let_decl', [ p[5], p[6] ], p[3])
+            current_scope = scopes.get(scope_number)
+            current_scope.add(p[3], p[5].leaf)
         elif len(p) == 7:
             p[0] = Node('let_decl', [ p[5] ], p[3])
+            current_scope = scopes.get(scope_number)
+            current_scope.add(p[3], p[5].leaf)
         elif len(p) == 6:
             p[0] = Node('let_decl', [ p[4] ], p[3])
+            current_scope = scopes.get(scope_number)
+            current_scope.add(p[3], 'var')
         else:
             p[0] = Node('let_decl', None, p[3])
+            current_scope = scopes.get(scope_number)
+            current_scope.add(p[3], 'var')
     else:
         if len(p) == 7:
             p[0] = Node('let_decl', [ p[4], p[5] ], p[2])
+            current_scope = scopes.get(scope_number)
+            current_scope.add(p[2], p[4].leaf)
         elif len(p) == 6:
             p[0] = Node('let_decl', [ p[4] ], p[2])
+            current_scope = scopes.get(scope_number)
+            current_scope.add(p[2], p[4].leaf)
         elif len(p) == 5:
             p[0] = Node('let_decl', [ p[3] ], p[2])
+            current_scope = scopes.get(scope_number)
+            current_scope.add(p[2], 'var')
         else:
             p[0] = Node('let_decl', None, p[2])
+            current_scope = scopes.get(scope_number)
+            current_scope.add(p[2], 'var')
 
 # Inicializar variable
 def p_init(p):
@@ -143,12 +178,20 @@ def p_expr(p):
 
 # Expresiones de bloque
 def p_block_expr(p):
-    '''block_expr : LBRACKET block_expr_a RBRACKET
-                  | LBRACKET block_expr_b RBRACKET
-                  | LBRACKET block_expr_c RBRACKET
-                  | LBRACKET block_expr_d RBRACKET
-                  | LBRACKET block_expr_e RBRACKET '''
-    p[0] = Node('block', [ p[2] ], None)
+    '''block_expr : LBRACKET new_scope block_expr_a RBRACKET
+                  | LBRACKET new_scope block_expr_b RBRACKET
+                  | LBRACKET new_scope block_expr_c RBRACKET
+                  | LBRACKET new_scope block_expr_d RBRACKET
+                  | LBRACKET new_scope block_expr_e RBRACKET '''
+    p[0] = Node('block', [ p[3] ], None)
+
+def p_new_scope(p):
+    'new_scope :'
+    # Create a new scope for local variables
+    s = Table()
+    global scope_number
+    scope_number += 1
+    scopes.add(scope_number, s)
 
 # Expresiones de apoyo para block_expr
 def p_block_expr_a(p):
@@ -265,16 +308,12 @@ def p_cond_expr(p):
         p[0] = Node('cond_expr', [ p[1] ], None)
 
 # Literales
-def p_lit_suffix(p):
-    'lit_suffix : ID'
-    p[0] = Node('lit_suffix', None, p[1])
-
 def p_literal(p):
     '''literal : string_lit
                | char_lit
                | num_lit
                | bool_lit
-               | lit_suffix '''
+               | id_lit '''
     p[0] = Node('literal', [ p[1] ], None)
 
 # String
@@ -298,6 +337,11 @@ def p_bool_lit(p):
     '''bool_lit : TRUE
                 | FALSE '''
     p[0] = Node('bool_lit', None, p[1])
+
+# IDs
+def p_id_lit(p):
+    'id_lit : ID'
+    p[0] = Node('id_lit', None, p[1])
 
 # Operadores
 def p_binop(p):
@@ -384,11 +428,12 @@ try:
     with open(inFile,'r') as file:
         data = file.read()
 
-    result = parser.parse(data)
-    # print(result) # Imprimir resultado en consola
+    result = parser.parse(data) # generar resultado (AST)
+    print(scopes)
     
     file.close()
 
+    # Escribir AST generado en archivo 'result.txt'
     r = open("result.txt", 'w+')
     r.write(str(result))
     r.close()
