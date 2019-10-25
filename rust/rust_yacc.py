@@ -90,6 +90,7 @@ def p_fn_item(p):
     '''fn_item : FN ID add_to_scope LPAREN RPAREN block_expr '''
     p[0] = Node('fn_item', [ p[6] ], p[2])
 
+# Acción para agregar función dentro de la tabla de símbolos
 def p_add_to_scope(p):
     'add_to_scope :'
     current_scope = scopes.get(scope_number)
@@ -187,6 +188,7 @@ def p_block_expr(p):
                   | LBRACKET new_scope block_expr_e RBRACKET '''
     p[0] = Node('block', [ p[3] ], None)
 
+# Acción para generar un nuevo bloque de alcance
 def p_new_scope(p):
     'new_scope :'
     # Create a new scope for local variables
@@ -431,7 +433,7 @@ try:
         data = file.read()
 
     result = parser.parse(data) # generar resultado (AST)
-    print(scopes)
+    print(scopes) # imprimir alcances en consola
     
     file.close()
 
