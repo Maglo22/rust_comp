@@ -39,6 +39,7 @@ class Node:
             ret += child.__str__(level+1)
         return ret
 
+# Clase para agregar nuevos alcances e IDs dentro de estos
 class Table(dict):
     def __init__(self):
         self = dict()
@@ -46,10 +47,11 @@ class Table(dict):
     def add(self, key, value):
         self[key] = value
 
-# Tabla de símbolos (hash)
+# Bloques de alcances (diccionarios)
 scopes = Table()
 scope_number = 0
 
+# Primer alcance
 s = Table()
 scopes.add(scope_number, s)
 
