@@ -5,3 +5,6 @@ __pycache__/
 # Parser
 parser.out
 parsetab.py
+
+# Result
+result.txt
