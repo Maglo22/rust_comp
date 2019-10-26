@@ -20,7 +20,7 @@ try:
     with open(inFile,'r') as file:
         data = file.read()
 
-    result = rust_yacc.parse(data, debug=0) # generar resultado (AST)
+    result = rust_yacc.parse(data, 0) # generar resultado (AST)
     rust_yacc.print_scopes() # imprimir alcances
     
     file.close()
