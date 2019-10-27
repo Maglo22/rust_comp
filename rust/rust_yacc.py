@@ -15,7 +15,7 @@ precedence = (
     ('left', 'AND'),
     ('left', 'PLUS', 'MINUS'),
     ('left', 'MULT', 'DIVIDE', 'REMINDER'),
-    ('nonassoc', 'DOT'),
+    ('left', 'DOT'),
 )
 
 # Clase genérica para un nodo del AST
@@ -58,13 +58,25 @@ scopes.add(scope_number, s)
 # Checar si la llave ya se encuentra en alguna de las tablas de símbolos
 def scope_check(key):
     for scope in range(0, scope_number + 1):
-        print('Comprobando ' + str(key) + ' en alcance ' + str(scope))
+        #print('Comprobando ' + str(key) + ' en alcance ' + str(scope))
         if key in scopes[scope]:
             return True # ya está registrada en una tabla de símbolos
     
     return False # no se encuentra en ninguna tabla de símbolos
 
 # -- Sintaxis en BNF -- #
+
+def p_program(p):
+    '''program : list_stmt '''
+    p[0] = Node('program', [ p[1] ], None)
+
+def p_list_stmt(p):
+    '''list_stmt : stmt list_stmt
+                 | stmt '''
+    if len(p) == 3:
+        p[0] = Node('list_stmt', [ p[1], p[2] ], None)
+    else:
+        p[0] = Node('list_stmt', [ p[1] ], None)
 
 # Statements
 def p_statement(p):
@@ -96,8 +108,8 @@ def p_item(p):
 
 # Funciones
 def p_fn_item(p):
-    '''fn_item : FN ID add_to_scope LPAREN RPAREN block_expr '''
-    p[0] = Node('fn_item', [ p[6] ], p[2])
+    '''fn_item : FN ID add_to_scope paren_expr_list block_expr '''
+    p[0] = Node('fn_item', [ p[4], p[5] ], p[2])
 
 # Acción para agregar función dentro de la tabla de símbolos
 def p_add_to_scope(p):
@@ -191,6 +203,7 @@ def p_expr(p):
             | method_call_expr
             | binop_expr
             | paren_expr
+            | call_expr
             | while_expr
             | loop_expr
             | break_expr
@@ -243,21 +256,35 @@ def p_block_expr_e(p):
     '''block_expr_e : expr '''
     p[0] = Node('block_e', [ p[1] ], None)
 
-# Métodos
+# Llamada a un método
 def p_method_call_expr(p):
     '''method_call_expr : expr DOT ID paren_expr_list '''
+    p[0] = Node('method_call', [ p[1], p[4] ], p[3])
 
-# expr_list : [ expr [ ',' expr ]* ] ? ;
-def p_expr_list(p):
-    '''expr_list : empty '''
-
-# paren_expr_list : '(' expr_list ')' ;
-def p_paren_expr_list(p):
-    '''paren_expr_list : LPAREN expr_list RPAREN '''
-
-# call_expr : expr paren_expr_list ;
+# Llamada a una función
 def p_call_expr(p):
     '''call_expr : expr paren_expr_list '''
+    p[0] = Node('call_expr', [ p[1], p[2] ], None)
+
+# Parámetros en una función
+def p_paren_expr_list(p):
+    '''paren_expr_list : LPAREN expr_list RPAREN '''
+    p[0] = Node('paren_expr_list', [ p[2] ], None)
+
+# Lista de parámetros en una función
+def p_expr_list(p):
+    '''expr_list : expr
+                 | expr e_list
+                 | empty '''
+    if len(p) == 3:
+        p[0] = Node('expr_list', [ p[1], p[2] ], None)
+    else:
+        p[0] = Node('expr_list', [ p[1] ], None)
+
+# Expresión de apoyo para lista de parámetros
+def p_e_list(p):
+    '''e_list : COMA expr_list '''
+    p[0] = Node('e_list', [ p[2] ], p[1])
 
 # Operadores binarios
 def p_binop_expr(p):
@@ -314,22 +341,24 @@ def p_else_tail(p):
 def p_return_expr(p):
     '''return_expr : RETURN
                    | RETURN expr'''
-    if len(p) == 2:
-        p[0] = Node('return', None, 'return')
-    else:
+    if len(p) == 3:
         p[0] = Node('return', [ p[2] ], None)
+    else:
+        p[0] = Node('return', None, 'return')
 
 # Expresiones para Condicionales y Ciclos
 def p_cond_expr(p):
     '''cond_expr : literal
-                 | literal binop literal 
-                 | literal binop literal binop literal'''
-    if len(p) == 6:
-        p[0] = Node('cond_expr', [ p[1], p[2], p[3], p[4], p[5] ], None)
-    elif len(p) == 4:
-        p[0] = Node('cond_expr', [ p[1], p[2], p[3] ], None)
+                 | literal cond_op '''
+    if len(p) == 3:
+        p[0] = Node('cond_expr', [ p[1], p[2] ], None)
     else:
         p[0] = Node('cond_expr', [ p[1] ], None)
+
+# Expresión de ayuda para condiciones
+def p_cond_op(p):
+    '''cond_op : binop cond_expr '''
+    p[0] = Node('cond_op', [ p[1], p[2] ], None)
 
 # Literales
 def p_literal(p):
@@ -365,11 +394,7 @@ def p_bool_lit(p):
 # IDs
 def p_id_lit(p):
     'id_lit : ID'
-    p[0] = p[1]
-    if scope_check(p[0]):
-        p[0] = Node('id_lit', None, p[1])
-    else:
-        raise SyntaxError
+    p[0] = Node('id_lit', None, p[1])
 
 # Operadores
 def p_binop(p):
