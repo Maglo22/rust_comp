@@ -7,4 +7,4 @@ parser.out
 parsetab.py
 
 # Result
-result.txt
+AST.txt
