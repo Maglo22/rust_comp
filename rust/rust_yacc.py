@@ -6,6 +6,18 @@ import rust_lex
 
 tokens = rust_lex.tokens
 
+precedence = (
+    ('nonassoc', 'RETURN', 'BREAK'),
+    ('right', 'ASSIGN'),
+    ('left', 'EQUALS', 'NE', 'LT', 'GT', 'LE', 'GE'),
+    ('left', 'OR'),
+    ('left', 'XOR'),
+    ('left', 'AND'),
+    ('left', 'PLUS', 'MINUS'),
+    ('left', 'MULT', 'DIVIDE', 'REMINDER'),
+    ('nonassoc', 'DOT'),
+)
+
 # Clase genérica para un nodo del AST
 class Node:
     def __init__(self, type, children=None, leaf=None):
@@ -42,6 +54,15 @@ scope_number = 0
 # Primer alcance
 s = Table()
 scopes.add(scope_number, s)
+
+# Checar si la llave ya se encuentra en alguna de las tablas de símbolos
+def scope_check(key):
+    for scope in range(0, scope_number + 1):
+        print('Comprobando ' + str(key) + ' en alcance ' + str(scope))
+        if key in scopes[scope]:
+            return True # ya está registrada en una tabla de símbolos
+    
+    return False # no se encuentra en ninguna tabla de símbolos
 
 # -- Sintaxis en BNF -- #
 
@@ -81,22 +102,25 @@ def p_fn_item(p):
 # Acción para agregar función dentro de la tabla de símbolos
 def p_add_to_scope(p):
     'add_to_scope :'
-    current_scope = scopes.get(scope_number)
-    current_scope.add(p[-1], 'fn')
+    if not scope_check(p[-1]):
+        current_scope = scopes.get(scope_number)
+        current_scope.add(p[-1], 'fn')
 
 # Constantes
 def p_const_item(p):
     '''const_item : CONST ID COLON type ASSIGN expr SEMICOLON '''
     p[0] = Node('const_item', [ p[4], p[6] ], p[2])
-    current_scope = scopes.get(scope_number)
-    current_scope.add(p[2], p[4].leaf)
+    if not scope_check(p[2]):
+        current_scope = scopes.get(scope_number)
+        current_scope.add(p[2], p[4].leaf)
 
 # Estáticos
 def p_static_item(p):
     '''static_item : STATIC ID COLON type ASSIGN expr SEMICOLON '''
     p[0] = Node('static_item', [ p[4], p[6] ], p[2])
-    current_scope = scopes.get(scope_number)
-    current_scope.add(p[2], p[4].leaf)
+    if not scope_check(p[2]):
+        current_scope = scopes.get(scope_number)
+        current_scope.add(p[2], p[4].leaf)
 
 # Variables
 def p_let_decl(p):
@@ -111,37 +135,45 @@ def p_let_decl(p):
     if p[2] == 'mut':
         if len(p) == 8:
             p[0] = Node('let_decl', [ p[5], p[6] ], p[3])
-            current_scope = scopes.get(scope_number)
-            current_scope.add(p[3], p[5].leaf)
+            if not scope_check(p[3]):
+                current_scope = scopes.get(scope_number)
+                current_scope.add(p[3], p[5].leaf)
         elif len(p) == 7:
             p[0] = Node('let_decl', [ p[5] ], p[3])
-            current_scope = scopes.get(scope_number)
-            current_scope.add(p[3], p[5].leaf)
+            if not scope_check(p[3]):
+                current_scope = scopes.get(scope_number)
+                current_scope.add(p[3], p[5].leaf)
         elif len(p) == 6:
             p[0] = Node('let_decl', [ p[4] ], p[3])
-            current_scope = scopes.get(scope_number)
-            current_scope.add(p[3], 'var')
+            if not scope_check(p[3]):
+                current_scope = scopes.get(scope_number)
+                current_scope.add(p[3], 'var')
         else:
             p[0] = Node('let_decl', None, p[3])
-            current_scope = scopes.get(scope_number)
-            current_scope.add(p[3], 'var')
+            if not scope_check(p[3]):
+                current_scope = scopes.get(scope_number)
+                current_scope.add(p[3], 'var')
     else:
         if len(p) == 7:
             p[0] = Node('let_decl', [ p[4], p[5] ], p[2])
-            current_scope = scopes.get(scope_number)
-            current_scope.add(p[2], p[4].leaf)
+            if not scope_check(p[2]):
+                current_scope = scopes.get(scope_number)
+                current_scope.add(p[2], p[4].leaf)
         elif len(p) == 6:
             p[0] = Node('let_decl', [ p[4] ], p[2])
-            current_scope = scopes.get(scope_number)
-            current_scope.add(p[2], p[4].leaf)
+            if not scope_check(p[2]):
+                current_scope = scopes.get(scope_number)
+                current_scope.add(p[2], p[4].leaf)
         elif len(p) == 5:
             p[0] = Node('let_decl', [ p[3] ], p[2])
-            current_scope = scopes.get(scope_number)
-            current_scope.add(p[2], 'var')
+            if not scope_check(p[2]):
+                current_scope = scopes.get(scope_number)
+                current_scope.add(p[2], 'var')
         else:
             p[0] = Node('let_decl', None, p[2])
-            current_scope = scopes.get(scope_number)
-            current_scope.add(p[2], 'var')
+            if not scope_check(p[2]):
+                current_scope = scopes.get(scope_number)
+                current_scope.add(p[2], 'var')
 
 # Inicializar variable
 def p_init(p):
@@ -333,7 +365,11 @@ def p_bool_lit(p):
 # IDs
 def p_id_lit(p):
     'id_lit : ID'
-    p[0] = Node('id_lit', None, p[1])
+    p[0] = p[1]
+    if scope_check(p[0]):
+        p[0] = Node('id_lit', None, p[1])
+    else:
+        raise SyntaxError
 
 # Operadores
 def p_binop(p):
@@ -402,28 +438,27 @@ def p_empty(p):
 
 # Manejar errores (modo pánico)
 def p_error(p):
-    print("Error de sintaxis en '%s' " % p.value)
+    print("Error de sintaxis en '%s' (línea %s)" % (p.value, p.lexer.lineno))
     if not p:
         print("EOF")
         return
     
     while True:
         tok = parser.token() # siguiente token
-        if not tok or tok.type == 'RBRACKET':
+        if not tok or tok.type == 'SEMICOLON':
             break
-        parser.restart()
+    parser.restart()
 
 # Construir analizador
 parser = yacc.yacc()
 
 # Función para realizar análisis
-def parse(data, debug=0):
+def parse(data, debug=0, scope=False):
     parser.error = 0
     p = parser.parse(data, debug=debug)
     if parser.error:
         return None
+    
+    if scope:
+        print(scopes)
     return p
-
-# Imprimir alcances en consola
-def print_scopes():
-    print(scopes)
